@@ -5,11 +5,12 @@ This lab is provided as part of [AWS Innovate Data Edition](https://aws.amazon.c
 ## Table of Contents  
 * [Overview](#overview)  
 * [Architecture](#architecture)  
-* [Pre-Requisites](#pre-Requisites)  
-* [Setting up Amazon Kinesis Data Generator Tool](#setting-up-amazon-kinesis-data-generator-tool)  
-* [Kinesis Analytics Pipeline Application setup](#kinesis-analytics-pipeline-application-setup)
-* [Configure Output stream to a Destination](#configure-output-stream-to-a-destination)
-* [Test E2E Architecture](#test-e2e-architecture)
+* [Step 1 - Create Redshift Cluster](#step-1---create-redshift-cluster)  
+* [Step 2 - Setup Student dataset](#step-2---setup-student-dataset)  
+* [Step 3 - Create VPC Endpoints](#step-3---create-vpc-endpoints)
+* [Step 4 - Alter Security Group Rules](#step-4---alter-security-group-rules)
+* [Step 5 - Create an S3 Bucket](#step-5---create-an-s3-bucket)
+* [Step 6 - Prepare data using DataBrew](#step-6---prepare-data-using-databrew)
 * [Cleanup](#cleanup)
 
 ## Overview
@@ -41,14 +42,16 @@ In this lab we will setup the following architecture. The architecture will have
 2. Click on create cluster and name the cluster ``student-cluster``.
 3. You could choose the **Free Trial** option which will create a cluster will sample data. For this lab we will choose **Production**. 
                 ![createRSClusterStudent](./images/createRSClusterStudent.png)
-4. Leave the checkbox for **Load Sample data** unchecked
-5. Use defaults for VPC and Security group. **Note the security group.** We will alter the inbound and outbound rules for this security group at a later step.
-                ![rsadditionalconfig](./images/rsadditionalconfig.png)
-6. Select Create Cluster.
+4. Select the instance type as dc2.large and 2 nodes.
+5. Leave the checkbox for **Load Sample data** unchecked
+6. Use defaults for VPC and Security group. **Note the security group.** We will alter the inbound and outbound rules for this security group at a later step.
+               ![rsadditionalconfig](./images/rsadditionalconfig.png)
+7. Select Create Cluster.
 
 ## Step 2 - Setup Student Dataset
 1. In the Redshift Console open the Query Editorfrm the side panel
                 ![opensqleditor](./images/opensqleditor.png)
+    * You could also use your preferred SQL client to execute the SQL statements. See here for connecting using [SQLWorkBench/J](https://docs.aws.amazon.com/redshift/latest/mgmt/connecting-using-workbench.html)
 2. Connect to the 'dev' db which is created during the creation of the Cluster.
                 ![connecttodevdb](./images/connecttodevdb.png)
 3. In the query editor run the [DDLSchemaTable.sql](./scripts/SQL/DDLSchemaTable.sql)
@@ -92,6 +95,24 @@ In this lab we will setup the following architecture. The architecture will have
 3. Create 2 folders namely, ```AWSDatasetOutput``` and ```recipeJobOutput``.
                 ![s3bucket-dsprefix.png](./images/s3bucket-dsprefix.png)
 
+## Step 6 - Create an IAM Role
+#### Create new IAM Policy
+1. Go to the [IAM Policy console](https://console.aws.amazon.com/iamv2/home?#/policies).
+2. Click on Create Policy.
+3. Navigate to JSON sub tab and paste the contents of the [policy json](./json/AwsGlueDataBrewDataResourcePolicy-open.json)
+    * This policy is an extension of [AwsGlueDataBrewDataResourcePolicy](https://docs.aws.amazon.com/databrew/latest/dg/iam-policy-for-data-resources-role.html)
+    * Additionally to the permissions [AwsGlueDataBrewDataResourcePolicy](https://docs.aws.amazon.com/databrew/latest/dg/iam-policy-for-data-resources-role.html), this databrew instance also requires a few extra permissions. e.g. glue:GetConnection.
+    * Note: This policy can be further restricted to allow access to specific resources. An example of a more restricted policy is [AwsGlueDataBrewDataResourcePolicy.json](./json/AwsGlueDataBrewDataResourcePolicy.json). In this example, the resources section is more specific to allow access to the specific S3 bucket and the specific glue connection.
+4. Click Next Tags, then enter ```AwsGlueDataBrewDataResourcePolicy``` as the name of the Policy and click on Create Policy.
+#### Create new IAM Role
+1. Go to the [IAM Role console](https://console.aws.amazon.com/iamv2/home#/roles).
+2. Click on Create Role. 
+3. Select Glue as the trusted entity. Click on Next: Permissions
+4. Filter for AwsGlueDataBrewDataResourcePolicy and select policy. 
+5. Click on Next:Tags. Add any tags as appropriate. 
+6. Click on Next: Review 
+7. Record ```AwsGlueDataBrewDataAccessRole``` as the role name and click on Create Role.
+
 ## Step 6 - Prepare data using DataBrew
 #### Create new connection
 1. Go to the [AWS Glue DataBrew](https://ap-southeast-2.console.aws.amazon.com/databrew/home?region=ap-southeast-2#landing).
@@ -107,141 +128,101 @@ In this lab we will setup the following architecture. The architecture will have
 2. The connection name should be auto-populated. Select the table, ```study_details```.
 3. Enter the s3 destination as ```s3://bucket-name/AWSDatasetOutput/
 4. Click on Create dataset.
-                ![studentrs-datasetcreate.png](./images/studentrs-datasetcreate.png) 
+                ![studentrs-datasetcreate.png](./images/studentrs-datasetcreate.png)
+5. At this point, if you open the dataset and navigate to the Data profile overview subtab or Column statistics subtab, you will see no information. This is because a data profiling has not been completed. We will do this in a future step.
+                ![noColumnStatistics.png](./images/noColumnStatistics.png)
+#### Create new project
+1. Select the created dataset and click on 'Create project with this dataset'.
+                ![createnewprojectfromds.png](./images/createnewprojectfromds.png)
+2. Enter the project name as ```studentrs-project```. The recipe name, the dataset name and the table name should be autopopulated.
+                ![createdbrewproject-1.png.png](./images/createdbrewproject-1.png)
+3. Select the Role Name as ```AwsGlueDataBrewDataAccessRole``` created in [Step 6](#step-6---create-an-iam-role)
+4. Click on Create Project. Once created, the project will run and provide a sample dataset view.
+                ![studentrs-projectpreview.png](./images/studentrs-projectpreview.png) 
+#### Data profiling 
+1. Navigate to the Jobs in the left pane and go to the Profile job
+                ![createJobsProfiles.png](./images/createJobsProfiles.png)
+2. Click on 'Create Job' and enter the job name as ```student-profile-job```.
+3. Select the 'Create a profile job' option for Job Type.
+4. Enter ```studentrs-dataset``` as Job input.
+                ![createProfileJobSetting.png](./images/createProfileJobSetting.png)
+5. For the job output setting enter the s3 location created in [Step 5](#step-5---create-an-s3-bucket). Set as s3://```bucketname```/.
+                ![createProfilejob.png](./images/createProfilejob.png)
+6. Click on 'Create and run job'.
+7. Select the created job and monitor progress to make sure the job has completed. This might take a few minutes depending on the size of the dataset.
+                ![jobcompletion.png](./images/jobcompletion.png)
+8. Navigate to the Data lineage sub tab for the selected dataset to view a graphical representation of the data flow.
+                ![datalineageview.png](./images/datalineageview.png)
+9. Navigate to the dataset and view column statistics. The data profiling job populates this data.
+                ![columnstatistics.png](./images/columnstatistics.png)
+10. The data profiling provides insight into the data. e.g. missing data, outliers etc. In the dataset here we have 3 records without age field populated.
+                ![columnstatistics-2.png](./images/columnstatistics-2.png)
 
-
-
-https://docs.aws.amazon.com/redshift/latest/gsg/rs-gsg-create-an-iam-role.html
-https://docs.aws.amazon.com/glue/latest/dg/setup-vpc-for-glue-access.html
-https://docs.aws.amazon.com/redshift/latest/gsg/rs-gsg-launch-sample-cluster.html
-
-
-https://docs.aws.amazon.com/redshift/latest/gsg/t_creating_database.html
-
-
-https://docs.aws.amazon.com/redshift/latest/mgmt/connecting-using-workbench.html
-https://www.sql-workbench.eu/manual/install.html
-
-Create Schema and Tabnle
-https://raw.githubusercontent.com/aws-samples/data-transformation-of-redshift-using-glue-databrew/main/DDL.sql
-
-Insert into study_details
-https://raw.githubusercontent.com/aws-samples/data-transformation-of-redshift-using-glue-databrew/main/insert_sql.sql
-
-create role automatically for databrew
-Did not work--adn also s3 gateway endpoint(https://docs.aws.amazon.com/databrew/latest/dg/vpc-endpoint.html)
-
-New role required as per 
-1. https://docs.aws.amazon.com/databrew/latest/dg/setting-up-iam-policy-for-data-resources-role.html
-2. https://docs.aws.amazon.com/databrew/latest/dg/setting-up-iam-role-to-use-in-databrew.html
-
-
-
-
-
-Before next step make sure you have an iam policy created.. and a role associated. Link to the Public website
-talk about additionally you need
-
-
-Create databrew project from a dataset
-createnewprojectfromds.png
-
-createdbrewproject-1.png
-
-
-Before creating a Profile job view the column statistics.  noColumnStatistics.png
-
-Create a profiling job
-createJobsProfiles.png
-
-Create Job> JOb name: student-profile-job
-Create a Profile Job Select a data set
-Provide the S3 location for job output.
-For Role name, choose the role to be used with DataBrew.
-Choose Create and run job.
-
-createProfileJobSetting.png
-createProfilejob.png
-
-jobcompletion.png
-
-View column statistics post run.
-columnstatistics.png
-
-View the data linege
-datalineageview.png
-
-show missing data 
-missingdataage.png
-columnstatistics-2.png
-
-refine output to sage by deleting columns
-refineinputtosage.png
-refineinputtosage-2.png
-
-We know from the profiling report that the age value is missing in two records. Let’s fill in the missing value with the median age of other records.
-
-    Choose Missing and choose Fill with numeric aggregate.
-
-
-fillMissingwithAggregate.png
-fillMissingwithAggregate-2.png
-
-
-The next step is to convert the categorical value to a numerical value for the gender column.
-
-    Choose Mapping and choose Categorical mapping.
-    CategoryMapping.png
-    For Source column, choose gender.
-For Mapping options, select Map top 2 values.
-For Map values, select Map values to numeric values.
-For F, choose 1.
-For M, choose 2.
-
-categoricalmapping.png
-
-destinationmapped.png
-For Destination column, enter gender_mapped.
-For Apply transform to, select All rows.
-Choose Apply.
-
-ML algorithms often can’t work on label data directly, requiring the input variables to be numeric. One-hot encoding is one technique that converts categorical data that doesn’t have an ordinal relationship with each other to numeric data.
-
+#### Data refining
+1. DataBrew allows the refining of data by providing a number of tools that we will explore below. Using these tools, we can create databrew recipes to refine and prepare the data to be ingested by AWS Sagemaker to drive inferences.
+2. As part of the refining process, lets delete the first name, last name and the schoolname.
+                ![refineinputtosage.png](./images/refineinputtosage.png)
+                ![refineinputtosage-2.png](./images/refineinputtosage-2.png)
+3. We know from the profiling report that the age value is missing in three records. Let’s fill in the missing value with the median age of other records. Choose Missing and choose Fill with numeric aggregate. 
+                ![fillMissingwithAggregate.png](./images/fillMissingwithAggregate.png)
+                ![fillMissingwithAggregate-2.png](./images/fillMissingwithAggregate-2.png)
+4. The next step is to convert the categorical value to a numerical value for the gender column.
+    * Choose Mapping and choose Categorical mapping.
+                ![CategoryMapping.png](./images/CategoryMapping.png)
+    * For Source column, choose gender.
+    * For Mapping options, select Map top 2 values.
+    * For Map values, select Map values to numeric values.
+    * For F, choose 1.
+    * For M, choose 2.
+                ![categoricalmapping.png](./images/categoricalmapping.png)
+5. ML algorithms often can’t work on label data directly, requiring the input variables to be numeric. One-hot encoding is one technique that converts categorical data that doesn’t have an ordinal relationship with each other to numeric data.
 To apply one-hot encoding, complete the following steps:
+    * Choose Encode and choose One-hot encode column.   
+                ![onehotencode.png](./images/onehotencode.png)
+    * For Column select health
+                ![onehotencode-2.png](./images/onehotencode-2.png)
+    * Click Apply
+    * This steps splits the health column into a number of columns.
+6. A number of  similar changes can be done. e.g. deleting the original gender column and renaming the new gender_mapped column to gender etc.
+7. Post all the desired refinements, a recipe containing all the changes to be applied is created. This can be viewed on the right hand pane of the screen.
+                ![viewrecipe.png](./images/viewrecipe.png)
+8. The recipe can now be published so that it can be applied to the entire dataset. Select the publish recipe option and leave the version description as is.
+                ![PublishRecipe.png](./images/PublishRecipe.png)
+9. The published recipes can be viewed by selecting the Recipe option on the left pane.
+                ![viewpublshedrecipe.png](./images/viewpublshedrecipe.png)
+#### Create Recipe Job on entire dataset
+Now that the recipe is created it can be run to profile the entire data student dataset.
+1. On the recipe page, choose Create job with this Recipe.
+                ![createjobwithrecipe.png](./images/createjobwithrecipe.png)
+2. For Job name¸ enter ```student-performance```.
+3. Leave the job type as Create a recipe job
+4. Job input as the ```studentr-dataset```.
+5. Select the output to Amazon S3 and select the S3 bucket we created in [Step 5](#step-5---create-an-s3-bucket).
+                ![createrecipejob-s3output.png](./images/createrecipejob-s3output.png)
+6. For the IAM Role name select ```AwsGlueDataBrewDataAccessRole```
+7. Click on Create and run job.
+8. Navigate to the Job and wait for the job to finish. This should take a few minutes.
+                ![outputfromrecipejob-1.png](./images/outputfromrecipejob-1.png)
+9. Navigate to the output to view the results of the recipe job created in the selected Amazon S3 bucket.
+                ![viewpublshedrecipe.png](./images/outputfromrecipejob-2.png)
+10. This CSV file can now be fed into AL/ML services for further analysis as required.
 
-    Choose Encode and choose One-hot encode column.
-
-onehotencode.png
-    onehotencode-2
-
-Perform a few more similar changes and then View Recipe
-viewrecipe.png
-importdownloadrecipe.png
-
-Publish and view receipe
-PublishRecipe.png
-viewpublshedrecipe.png
-
-CreateJob with recipe
-createjobwithrecipe.png
-
-Enter the job name, 
-For Job name¸ enter student-performance.
-
-createrecipejob-s3output
-
-We use CSV as the output format.
-
-    For File type, choose CSV.
-    For Role name, choose an existing role or create a new one.
-    Choose Create and run job.
-
-    Set perms and submit
-
-    Output from a recipe job
-    outputfromrecipejob-1.png
-    outputfromrecipejob-2.png
-outputfromrecipejob-3.png - in an excel
-
-
-
+## Cleanup
+Follow the below steps to cleanup your account to prevent any aditional charges:
+* Navigate to the Jobs and delete the recipe job and the profiling job.
+                ![cleanup1.png](./images/cleanup1.png)
+* Navigate to the Recipes and delete the recipe and versions.
+                ![cleanup2.png](./images/cleanup2.png)
+* Navigate to the Projects and delete the project created in the lab.
+                ![cleanup3.png](./images/cleanup3.png)
+* Navigate to the Datasets and delete the dataset created in the lab.
+                ![cleanup4.png](./images/cleanup4.png)
+* Navigate to [AWS Glue service](https://ap-southeast-2.console.aws.amazon.com/glue/home?region=ap-southeast-2#) and navigate to connections. 
+* Delete connection created in the lab
+                ![cleanup5.png](./images/cleanup5.png)
+* Navigate to [S3 console](https://s3.console.aws.amazon.com/s3/home?region=ap-southeast-2#)
+* Empty and then delete the bucket created in [Step 5](#step-5---create-an-s3-bucket).
+* You can choose to remove the VPC Endpoints, IAM Policy and role and any security group alterations done.
+* Navigate to [Redshift console](https://ap-southeast-2.console.aws.amazon.com/redshiftv2/home?region=ap-southeast-2#dashboard)
+* Open the student-cluster and delete the cluster. Uncheck the prompt to take a snapshot before deletion of the cluster
+               ![cleanup6.png](./images/cleanup6.png) 
