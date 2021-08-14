@@ -11,6 +11,7 @@ This lab is provided as part of [AWS Innovate Data Edition](https://aws.amazon.c
 * [Step 4 - Alter Security Group Rules](#step-4---alter-security-group-rules)
 * [Step 5 - Create an S3 Bucket](#step-5---create-an-s3-bucket)
 * [Step 6 - Prepare data using DataBrew](#step-6---prepare-data-using-databrew)
+* [Summary](#summary)
 * [Cleanup](#cleanup)
 
 ## Overview
@@ -51,7 +52,7 @@ In this lab we will setup the following architecture. The architecture will have
 ## Step 2 - Setup Student Dataset
 1. In the Redshift Console open the Query Editorfrm the side panel
                 ![opensqleditor](./images/opensqleditor.png)
-    * You could also use your preferred SQL client to execute the SQL statements. See here for connecting using [SQLWorkBench/J](https://docs.aws.amazon.com/redshift/latest/mgmt/connecting-using-workbench.html)
+    You could also use your preferred SQL client to execute the SQL statements. See here for connecting using [SQLWorkBench/J](https://docs.aws.amazon.com/redshift/latest/mgmt/connecting-using-workbench.html)
 2. Connect to the 'dev' db which is created during the creation of the Cluster.
                 ![connecttodevdb](./images/connecttodevdb.png)
 3. In the query editor run the [DDLSchemaTable.sql](./scripts/SQL/DDLSchemaTable.sql)
@@ -92,17 +93,17 @@ In this lab we will setup the following architecture. The architecture will have
 ## Step 5 - Create an S3 bucket
 1. Go to the [S3 Console](https://s3.console.aws.amazon.com/s3/home?region=ap-southeast-2) and click on create bucket.
 2. S3 buckets have to unique. Select a unique name and create bucket.
-3. Create 2 folders namely, ```AWSDatasetOutput``` and ```recipeJobOutput``.
+3. Create 2 folders namely, ```AWSDatasetOutput``` and ```recipeJobOutput```.
                 ![s3bucket-dsprefix.png](./images/s3bucket-dsprefix.png)
 
 ## Step 6 - Create an IAM Role
 #### Create new IAM Policy
 1. Go to the [IAM Policy console](https://console.aws.amazon.com/iamv2/home?#/policies).
 2. Click on Create Policy.
-3. Navigate to JSON sub tab and paste the contents of the [policy json](./json/AwsGlueDataBrewDataResourcePolicy-open.json)
+3. Navigate to JSON sub tab and paste the contents of the [policy json](./scripts/json/AwsGlueDataBrewDataResourcePolicy-open.json)
     * This policy is an extension of [AwsGlueDataBrewDataResourcePolicy](https://docs.aws.amazon.com/databrew/latest/dg/iam-policy-for-data-resources-role.html)
     * Additionally to the permissions [AwsGlueDataBrewDataResourcePolicy](https://docs.aws.amazon.com/databrew/latest/dg/iam-policy-for-data-resources-role.html), this databrew instance also requires a few extra permissions. e.g. glue:GetConnection.
-    * Note: This policy can be further restricted to allow access to specific resources. An example of a more restricted policy is [AwsGlueDataBrewDataResourcePolicy.json](./json/AwsGlueDataBrewDataResourcePolicy.json). In this example, the resources section is more specific to allow access to the specific S3 bucket and the specific glue connection.
+    * Note: This policy can be further restricted to allow access to specific resources. An example of a more restricted policy is [AwsGlueDataBrewDataResourcePolicy.json](./scripts/json/AwsGlueDataBrewDataResourcePolicy.json). In this example, the resources section is more specific to allow access to the specific S3 bucket and the specific glue connection.
 4. Click Next Tags, then enter ```AwsGlueDataBrewDataResourcePolicy``` as the name of the Policy and click on Create Policy.
 #### Create new IAM Role
 1. Go to the [IAM Role console](https://console.aws.amazon.com/iamv2/home#/roles).
@@ -125,11 +126,12 @@ In this lab we will setup the following architecture. The architecture will have
                 ![DBrewnewconnection-1.png](./images/DBrewnewconnection-1.png)
 #### Create new dataset
 1. Select the created connection and click on 'Create dataset with this connection'.
-2. The connection name should be auto-populated. Select the table, ```study_details```.
-3. Enter the s3 destination as ```s3://bucket-name/AWSDatasetOutput/
-4. Click on Create dataset.
+2. Enter the Dataset name as ```studentrs-dataset```.
+3. The connection name should be auto-populated. Select the table, ```study_details```.
+4. Enter the s3 destination as ```s3://bucketname/AWSDatasetOutput/```
+5. Click on Create dataset.
                 ![studentrs-datasetcreate.png](./images/studentrs-datasetcreate.png)
-5. At this point, if you open the dataset and navigate to the Data profile overview subtab or Column statistics subtab, you will see no information. This is because a data profiling has not been completed. We will do this in a future step.
+6. At this point, if you open the dataset and navigate to the Data profile overview subtab or Column statistics subtab, you will see no information. This is because a data profiling has not been completed. We will do this in a future step.
                 ![noColumnStatistics.png](./images/noColumnStatistics.png)
 #### Create new project
 1. Select the created dataset and click on 'Create project with this dataset'.
@@ -138,7 +140,7 @@ In this lab we will setup the following architecture. The architecture will have
                 ![createdbrewproject-1.png.png](./images/createdbrewproject-1.png)
 3. Select the Role Name as ```AwsGlueDataBrewDataAccessRole``` created in [Step 6](#step-6---create-an-iam-role)
 4. Click on Create Project. Once created, the project will run and provide a sample dataset view.
-                ![studentrs-projectpreview.png](./images/studentrs-projectpreview.png) 
+
 #### Data profiling 
 1. Navigate to the Jobs in the left pane and go to the Profile job
                 ![createJobsProfiles.png](./images/createJobsProfiles.png)
@@ -146,13 +148,13 @@ In this lab we will setup the following architecture. The architecture will have
 3. Select the 'Create a profile job' option for Job Type.
 4. Enter ```studentrs-dataset``` as Job input.
                 ![createProfileJobSetting.png](./images/createProfileJobSetting.png)
-5. For the job output setting enter the s3 location created in [Step 5](#step-5---create-an-s3-bucket). Set as s3://```bucketname```/.
+5. For the job output setting enter the s3 location created in [Step 5](#step-5---create-an-s3-bucket). Set as ```s3://bucketname```/.
                 ![createProfilejob.png](./images/createProfilejob.png)
 6. Click on 'Create and run job'.
 7. Select the created job and monitor progress to make sure the job has completed. This might take a few minutes depending on the size of the dataset.
                 ![jobcompletion.png](./images/jobcompletion.png)
 8. Navigate to the Data lineage sub tab for the selected dataset to view a graphical representation of the data flow.
-                ![datalineageview.png](./images/datalineageview.png)
+![datalineageview.png](./images/datalineageview.png)
 9. Navigate to the dataset and view column statistics. The data profiling job populates this data.
                 ![columnstatistics.png](./images/columnstatistics.png)
 10. The data profiling provides insight into the data. e.g. missing data, outliers etc. In the dataset here we have 3 records without age field populated.
@@ -174,13 +176,12 @@ In this lab we will setup the following architecture. The architecture will have
     * For Map values, select Map values to numeric values.
     * For F, choose 1.
     * For M, choose 2.
-                ![categoricalmapping.png](./images/categoricalmapping.png)
-5. ML algorithms often can’t work on label data directly, requiring the input variables to be numeric. One-hot encoding is one technique that converts categorical data that doesn’t have an ordinal relationship with each other to numeric data.
-To apply one-hot encoding, complete the following steps:
+    ![categoricalmapping.png](./images/categoricalmapping.png)
+5. ML algorithms often can’t work on label data directly, requiring the input variables to be numeric. One-hot encoding is one technique that converts categorical data that doesn’t have an ordinal relationship with each other to numeric data. To apply one-hot encoding, complete the following steps:
     * Choose Encode and choose One-hot encode column.   
-                ![onehotencode.png](./images/onehotencode.png)
-    * For Column select health
-                ![onehotencode-2.png](./images/onehotencode-2.png)
+![onehotencode.png](./images/onehotencode.png)
+    * For Column select health.
+![onehotencode-2.png](./images/onehotencode-2.png)
     * Click Apply
     * This steps splits the health column into a number of columns.
 6. A number of  similar changes can be done. e.g. deleting the original gender column and renaming the new gender_mapped column to gender etc.
@@ -196,7 +197,7 @@ Now that the recipe is created it can be run to profile the entire data student 
                 ![createjobwithrecipe.png](./images/createjobwithrecipe.png)
 2. For Job name¸ enter ```student-performance```.
 3. Leave the job type as Create a recipe job
-4. Job input as the ```studentr-dataset```.
+4. Dataset input as ```studentrs-dataset```.
 5. Select the output to Amazon S3 and select the S3 bucket we created in [Step 5](#step-5---create-an-s3-bucket).
                 ![createrecipejob-s3output.png](./images/createrecipejob-s3output.png)
 6. For the IAM Role name select ```AwsGlueDataBrewDataAccessRole```
@@ -206,6 +207,9 @@ Now that the recipe is created it can be run to profile the entire data student 
 9. Navigate to the output to view the results of the recipe job created in the selected Amazon S3 bucket.
                 ![viewpublshedrecipe.png](./images/outputfromrecipejob-2.png)
 10. This CSV file can now be fed into AL/ML services for further analysis as required.
+
+## Summary
+In this lab, we created an Amazon Redshift cluster data warehouse and loaded a student dataset. We used a JDBC connection to create a DataBrew dataset for an Amazon Redshift table. We then performed data profiling followed by some data transformation using DataBrew, preparing the data to be ingested by a ML model building exercise.
 
 ## Cleanup
 Follow the below steps to cleanup your account to prevent any aditional charges:
