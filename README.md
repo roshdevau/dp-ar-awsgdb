@@ -16,6 +16,7 @@ Click [here](https://github.com/phonghuule/aws-innovate-data) to explore the ful
 * [Step 6 - Prepare data using DataBrew](#step-6---prepare-data-using-databrew)
 * [Summary](#summary)
 * [Cleanup](#cleanup)
+* [Survey](#survey)
 
 ## Overview
 
